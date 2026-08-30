@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0e0e0e;
+  --surface: #161616;
+  --surface2: #202020;
+  --surface3: #272727;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0ede8;
+  --muted: #606060;
+  --muted2: #909090;
+  --accent: #c8f07a;
+  --warn: #f0c87a;
+  --danger: #f07a7a;
+  --done-col: #404040;
+  --diamond: #a8d8f0;
+  --font-head: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+body { background: var(--bg); color: var(--text); font-family: var(--font-head); min-height: 100vh; }
+.layout { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+
+/* LEFT */
+.left { background: var(--surface); border-right: 1px solid var(--border); padding: 1.5rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.box { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; flex-shrink: 0; }
+.box-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted2); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 8px; }
+
+/* Clock */
+.clock-date { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); line-height: 1.1; }
+.clock-day { font-size: 11px; color: var(--muted2); margin-top: 2px; margin-bottom: 4px; }
+.clock-time { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+
+/* Focus hrs */
+.stat-val { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 2px; color: #7ac8f0; }
+.stat-sub { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+
+/* Monthly */
+.month-box { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.month-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-shrink: 0; flex-wrap: wrap; }
+.week-tab { font-family: var(--font-mono); font-size: 8px; padding: 4px 7px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.week-tab:hover { border-color: var(--border2); color: var(--muted2); }
+.week-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(200,240,122,0.07); }
+.month-input-row { display: flex; gap: 6px; margin-bottom: 7px; flex-shrink: 0; }
+.month-scroll { flex: 1; overflow-y: auto; }
+.month-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.month-item:last-child { border-bottom: none; }
+.month-cb { width:14px; height:14px; border:1.5px solid rgba(255,255,255,0.18); border-radius:3px; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition: all 0.15s; }
+.month-cb.done { background: var(--accent); border-color: var(--accent); }
+.month-cb.done::after { content:''; display:block; width:3px; height:7px; border:1.5px solid #0e0e0e; border-top:none; border-left:none; transform:rotate(45deg) translateY(-1px); }
+.month-item-text { flex: 1; font-size: 12px; color: var(--muted2); line-height: 1.4; }
+.month-item-text.done { color: var(--done-col); text-decoration: line-through; }
+.month-del { font-size: 14px; color: var(--muted); cursor: pointer; padding: 0 2px; opacity: 0; transition: opacity 0.15s; }
+.month-item:hover .month-del { opacity: 1; }
+.month-del:hover { color: var(--danger); }
+.todo-input { flex: 1; background: var(--bg); border: 1px solid var(--border2); border-radius: 5px; padding: 6px 10px; font-family: var(--font-head); font-size: 12px; color: var(--text); outline: none; }
+.todo-input::placeholder { color: var(--muted); }
+.todo-input:focus { border-color: var(--accent); }
+.todo-add-btn { background: var(--accent); border: none; border-radius: 5px; width: 30px; height: 30px; cursor: pointer; font-size: 18px; color: #0e0e0e; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s; }
+.todo-add-btn:hover { opacity: 0.85; }
+
+/* RIGHT */
+.right { padding: 2rem 2rem 4rem; overflow-y: auto; }
+.right-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1.2rem; }
+.right-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* Diamond counter */
+.diamond-wrap { display: flex; align-items: center; gap: 8px; }
+.currency-bar-bg { width: 160px; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+.currency-bar-fill-diamond { height: 100%; background: linear-gradient(90deg, #5b9bd5, #a8d8f0, #e8f4ff); border-radius: 3px; transition: width 0.4s ease; }
+.currency-count { font-family: var(--font-mono); font-size: 10px; color: var(--muted2); white-space: nowrap; }
+.currency-count .diamond-val { color: var(--diamond); font-weight: 500; }
+
+/* Consistency grid */
+.consist-wrap { margin-bottom: 2rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; }
+.consist-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted2); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+.consist-grid { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.consist-col { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+.consist-cell { width: 13px; height: 13px; border-radius: 2px; background: #1e1e1e; border: 1px solid rgba(255,255,255,0.04); cursor: default; position: relative; transition: transform 0.1s; }
+.consist-cell:hover { transform: scale(1.4); z-index: 10; }
+.consist-cell.today { border: 1.5px solid var(--accent) !important; }
+.consist-legend { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.leg-box { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+.leg-empty { background: #1e1e1e; border: 1px solid rgba(255,255,255,0.1); }
+.leg-low { background: rgba(200,220,255,0.25); }
+.leg-mid { background: rgba(200,220,255,0.6); }
+.leg-high { background: rgba(230,240,255,0.9); box-shadow: 0 0 4px rgba(200,220,255,0.6); }
+.leg-txt { font-family: var(--font-mono); font-size: 9px; color: var(--muted); margin-right: 6px; }
+
+/* Sections */
+.section { margin-bottom: 2rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.section-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface3); }
+.section-title-wrap { display: flex; align-items: center; gap: 8px; flex: 1; }
+.section-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; }
+.section-title-input { font-family: var(--font-head); font-size: 13px; font-weight: 700; color: var(--text); background: transparent; border: none; border-bottom: 1px solid var(--accent); outline: none; width: 200px; }
+.section-actions { display: flex; gap: 6px; align-items: center; }
+.sec-btn { font-family: var(--font-mono); font-size: 9px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border2); background: transparent; color: var(--muted2); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.sec-btn:hover { color: var(--text); }
+.sec-btn.del { color: var(--danger); border-color: rgba(240,122,122,0.25); }
+.sec-btn.del:hover { background: rgba(240,122,122,0.1); }
+.sec-btn.add { color: var(--accent); border-color: rgba(200,240,122,0.25); }
+.sec-btn.add:hover { background: rgba(200,240,122,0.07); }
+.goal-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+.goal-row:last-child { border-bottom: none; }
+.goal-row:hover { background: var(--surface3); }
+.checkbox { width:16px; height:16px; border:1.5px solid rgba(255,255,255,0.18); border-radius:3px; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition: all 0.15s; cursor: pointer; }
+.checkbox.checked { background: var(--accent); border-color: var(--accent); }
+.checkbox.checked::after { content:''; display:block; width:4px; height:8px; border:1.5px solid #0e0e0e; border-top:none; border-left:none; transform:rotate(45deg) translateY(-1px); }
+.goal-text { flex:1; font-size: 13px; color: var(--muted2); cursor: pointer; }
+.goal-text.done { color: var(--done-col); text-decoration: line-through; }
+.goal-text-input { flex:1; font-size: 13px; color: var(--text); background: transparent; border: none; border-bottom: 1px solid var(--accent); outline: none; font-family: var(--font-head); }
+.badge { font-family: var(--font-mono); font-size: 9px; padding: 3px 8px; border-radius: 4px; white-space: nowrap; letter-spacing: 0.04em; cursor: pointer; }
+.badge:hover { opacity: 0.8; }
+.badge-future { background: rgba(122,160,240,0.12); color: #7aa0f0; border: 1px solid rgba(122,160,240,0.2); }
+.badge-soon { background: rgba(240,200,122,0.12); color: var(--warn); border: 1px solid rgba(240,200,122,0.2); }
+.badge-overdue { background: rgba(240,122,122,0.12); color: var(--danger); border: 1px solid rgba(240,122,122,0.2); }
+.badge-done { background: rgba(74,74,74,0.3); color: var(--muted); border: 1px solid rgba(255,255,255,0.05); }
+/* Start/end date range — start tag is neutral (no urgency color, unlike the
+   end-date badge above which uses overdue/soon/future coloring) */
+.badge-range { display: flex; align-items: center; gap: 4px; }
+.badge-start { background: rgba(255,255,255,0.04); color: var(--muted2); border: 1px solid rgba(255,255,255,0.08); }
+.badge-arrow { font-size: 9px; color: var(--muted); }
+.goal-edit-btn { font-size: 12px; color: var(--muted); cursor: pointer; padding: 0 3px; opacity: 0; transition: opacity 0.15s; }
+.goal-row:hover .goal-edit-btn { opacity: 1; }
+.goal-del-btn { font-size: 14px; color: var(--muted); cursor: pointer; padding: 0 2px; opacity: 0; transition: opacity 0.15s; }
+.goal-row:hover .goal-del-btn { opacity: 1; }
+.goal-del-btn:hover { color: var(--danger); }
+
+/* Add section btn */
+.add-section-btn { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border: 1px dashed var(--border2); border-radius: 10px; cursor: pointer; color: var(--muted); font-family: var(--font-mono); font-size: 11px; transition: all 0.15s; margin-bottom: 2rem; }
+.add-section-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── TIMELINE ── */
+.timeline-wrap { margin-bottom: 2rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; }
+.timeline-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted2); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+
+/* Full-width, no scroll — uses % positions
+   Vertical zones (total 92px):
+     0–34px   : task bracket markers (rounded, open-bottom outline)
+     34px     : rail (dashed), sits ~3/4 down
+     40–54px  : hour labels (directly below rail)
+     58–76px  : checkboxes (rounded brackets)
+*/
+.timeline-inner {
+  position: relative;
+  width: 100%;
+  height: 92px;
+}
+
+/* Hour markers row — sits BELOW the rail now.
+   Each .tl-hour-block is still a full-width flex cell (so the whole hour
+   is clickable), but the label itself is pinned to the LEFT edge of its
+   cell (= the exact hour boundary) instead of being centered in the cell —
+   centering it made every label visually read ~30min later than reality. */
+.tl-hours-row {
+  position: absolute; top: 40px; left: 0; right: 0;
+  display: flex; height: 16px;
+}
+.tl-hour-block {
+  flex: 1; position: relative;
+  cursor: pointer; min-width: 0;
+}
+.tl-hour-label {
+  position: absolute; top: 0; left: 0;
+  transform: translateX(-50%); /* center the text glyph ON the boundary line */
+  font-family: var(--font-mono); font-size: 9px; color: var(--muted2);
+  line-height: 1; transition: color 0.15s;
+  user-select: none; white-space: nowrap;
+}
+.tl-hour-block.edge-hour:first-child .tl-hour-label { transform: none; left: 0; }
+.tl-hour-block:hover .tl-hour-label { color: var(--accent); }
+/* The 25th "next-day 5AM" end label — its own standalone element pinned to
+   the row's right edge, NOT a flex sibling, so it can't steal width from the
+   24 real hour cells (which would shift every other label's position again). */
+.tl-hour-end-block {
+  position: absolute; top: 0; right: 0;
+  width: 24px; height: 16px;
+  cursor: pointer;
+}
+.tl-hour-end-block .tl-hour-label {
+  position: absolute; top: 0; right: 0;
+  transform: translateX(50%); /* center on the boundary line, mirrored since it's the right edge */
+  font-family: var(--font-mono); font-size: 9px; color: var(--muted2);
+  line-height: 1; transition: color 0.15s;
+  user-select: none; white-space: nowrap;
+}
+.tl-hour-end-block:hover .tl-hour-label { color: var(--accent); }
+/* ticks removed from below rail in new layout — kept hidden for spacing */
+.tl-tick { display: none; }
+
+/* Rail — dashed, sits at ~3/4 down the box */
+.tl-rail {
+  position: absolute; top: 34px; left: 0; right: 0;
+  height: 0; border-top: 1.5px dashed var(--border2);
+  z-index: 1;
+}
+
+/* Task slots layer — spans full width, positioned absolutely */
+.tl-tasks { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+
+/* Each task: wrapper holds bracket marker above rail + checkbox below rail */
+.tl-task-wrapper {
+  position: absolute; top: 0; bottom: 0;
+  pointer-events: all;
+}
+
+/* The bracket marker — open-bottom rounded outline, sits above the rail */
+.tl-task-box {
+  position: absolute;
+  top: 4px;
+  height: 26px;          /* ends a few px above the rail at 34 */
+  left: 2px; right: 2px;
+  background: transparent;
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow: visible; transition: border-color 0.15s;
+  pointer-events: all; /* needed so hovering the bracket shows the time tooltip */
+  cursor: default;
+}
+.tl-task-bracket {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; /* the svg itself stays click-through; box handles hover */
+}
+.tl-task-bracket path {
+  fill: none;
+  stroke: var(--warn);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.15s;
+}
+.tl-task-wrapper:hover .tl-task-bracket path { stroke: #f5d99a; }
+.tl-task-wrapper.completed .tl-task-bracket path { stroke: var(--accent); }
+
+.tl-task-input {
+  position: relative; z-index: 2;
+  background: transparent; border: none; outline: none;
+  font-family: var(--font-head); font-size: 9px; color: var(--text);
+  text-align: center; width: calc(100% - 16px); cursor: text;
+  margin-top: 9px; pointer-events: all;
+}
+.tl-task-input::placeholder { color: var(--muted); }
+
+/* Delete btn inside box, top-right corner */
+.tl-task-del {
+  position: absolute; top: -2px; right: 2px;
+  font-size: 11px; color: var(--muted); cursor: pointer;
+  opacity: 0; transition: opacity 0.15s; line-height: 1;
+  pointer-events: all; z-index: 3;
+}
+.tl-task-wrapper:hover .tl-task-del { opacity: 1; }
+.tl-task-del:hover { color: var(--danger); }
+
+/* Checkbox — below the hour labels, rounded bracket style "[ ]" */
+.tl-task-cb {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+}
+.tl-task-cb.done {
+  /* keep centering transform while toggled */
+  transform: translateX(-50%);
+}
+.tl-task-cb svg path {
+  fill: none; stroke: rgba(255,255,255,0.3); stroke-width: 1.4;
+  stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.15s;
+}
+.tl-task-cb:hover svg path { stroke: var(--muted2); }
+.tl-task-cb.done svg path { stroke: var(--accent); }
+.tl-task-cb.done::after {
+  content:''; position: absolute; display:block; width:4px; height:8px;
+  border:1.5px solid var(--accent); border-top:none; border-left:none;
+  transform:rotate(45deg) translateY(-1px);
+}
+
+/* Pending begin marker — sits on the rail */
+.tl-begin-marker {
+  position: absolute; top: 29px; width: 2px; height: 12px;
+  background: var(--accent); border-radius: 1px; z-index: 10;
+}
+.tl-begin-marker::before {
+  content: '▶'; position: absolute; top: -8px; left: -3px;
+  font-size: 7px; color: var(--accent);
+}
+
+/* Popover */
+.tl-popover { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 6px 24px rgba(0,0,0,0.7); min-width: 90px; }
+.tl-pop-btn { font-family: var(--font-mono); font-size: 10px; padding: 5px 10px; border-radius: 5px; border: 1px solid var(--border); background: transparent; color: var(--muted2); cursor: pointer; text-align: left; transition: all 0.12s; white-space: nowrap; }
+.tl-pop-btn:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+.tl-pop-btn.begin { color: var(--accent); border-color: rgba(200,240,122,0.2); }
+.tl-pop-btn.begin:hover { background: rgba(200,240,122,0.07); }
+.tl-pop-btn.end { color: #f07a7a; border-color: rgba(240,122,122,0.2); }
+.tl-pop-btn.end:hover { background: rgba(240,122,122,0.07); }
+
+/* Zoom sub-popover */
+.tl-zoom-row { display: flex; gap: 3px; padding: 4px 4px 2px; border-top: 1px solid var(--border); margin-top: 2px; }
+.tl-zoom-min { font-family: var(--font-mono); font-size: 9px; padding: 4px 7px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.12s; }
+.tl-zoom-min:hover { border-color: var(--warn); color: var(--warn); }
+.tl-zoom-min.selected { border-color: var(--warn); color: var(--warn); background: rgba(240,200,122,0.08); }
+
+/* Calendar picker modal */
+.cal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.cal-box { background: var(--surface2); border: 1px solid var(--border2); border-radius: 14px; padding: 1.4rem; width: 300px; user-select: none; }
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.cal-nav { background: transparent; border: 1px solid var(--border2); border-radius: 5px; color: var(--muted2); cursor: pointer; font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.cal-nav:hover { border-color: var(--accent); color: var(--accent); }
+.cal-month-year { font-size: 13px; font-weight: 700; color: var(--text); }
+.cal-dow-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.cal-dow { font-family: var(--font-mono); font-size: 9px; color: var(--muted); text-align: center; padding: 3px 0; }
+.cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-day { font-family: var(--font-mono); font-size: 11px; text-align: center; padding: 6px 2px; border-radius: 4px; cursor: pointer; color: var(--muted2); transition: all 0.12s; border: 1px solid transparent; }
+.cal-day:hover:not(.cal-empty):not(.cal-past) { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+.cal-day.cal-empty { cursor: default; }
+.cal-day.cal-past { color: var(--muted); cursor: not-allowed; opacity: 0.4; }
+.cal-day.cal-today { border-color: var(--accent); color: var(--accent); }
+.cal-day.cal-selected { background: var(--accent); color: #0e0e0e; font-weight: 700; border-color: var(--accent); }
+.cal-title { font-family: var(--font-mono); font-size: 10px; color: var(--muted2); margin-bottom: 12px; letter-spacing: 0.04em; }
+.cal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.cal-btn { font-family: var(--font-mono); font-size: 11px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border2); background: transparent; color: var(--muted2); cursor: pointer; }
+.cal-btn.confirm { background: var(--accent); color: #0e0e0e; border-color: var(--accent); font-weight: 600; }
+.cal-btn.confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Tooltip */
+.cell-tooltip { position: fixed; z-index: 300; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; padding: 8px 10px; font-family: var(--font-mono); font-size: 10px; color: var(--text); pointer-events: none; max-width: 220px; line-height: 1.6; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+.tooltip-date { color: var(--muted2); font-size: 9px; margin-bottom: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
+.tooltip-done { color: var(--accent); }
+.tooltip-pending { color: var(--danger); }
+.tooltip-empty { color: var(--muted); font-style: italic; }
+
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+/* Live rooms */
+.private-files-btn{margin-left:8px;padding:7px 10px;border:1px solid var(--border2);background:transparent;color:var(--muted2);border-radius:5px;cursor:pointer;font-family:var(--font-mono);font-size:10px}.private-files-btn:hover{border-color:var(--accent);color:var(--accent)}.files-box{width:min(570px,calc(100vw - 32px));max-height:min(680px,calc(100vh - 32px));overflow:auto;background:var(--surface2);border:1px solid var(--border2);border-radius:14px;padding:1.4rem}.files-box h2{font-size:18px;margin-bottom:5px}.files-box p{font-size:12px;color:var(--muted2);line-height:1.55;margin-bottom:14px}.files-drop{display:block;border:1px dashed var(--border2);border-radius:8px;padding:18px;text-align:center;cursor:pointer;color:var(--accent);font-family:var(--font-mono);font-size:11px}.files-drop input{display:none}.private-file-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}.private-file-row:last-child{border-bottom:0}.private-file-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.private-file-meta{font-size:10px;color:var(--muted2);margin-top:3px}.private-file-action{border:1px solid var(--border2);background:transparent;color:var(--text);border-radius:5px;padding:5px 7px;cursor:pointer;font-family:var(--font-mono);font-size:10px}.private-file-action:hover{border-color:var(--accent);color:var(--accent)}.private-file-action.delete:hover{border-color:var(--danger);color:var(--danger)}.files-empty{padding:22px 0;color:var(--muted2);font-size:12px;text-align:center}
+.live-btn { font-family:var(--font-mono); font-size:10px; padding:6px 10px; border-radius:5px; border:1px solid rgba(168,216,240,.35); background:rgba(168,216,240,.08); color:var(--diamond); cursor:pointer; }.member-remove { margin-top:8px; font-family:var(--font-mono); font-size:9px; padding:4px 7px; color:var(--danger); border:1px solid rgba(240,122,122,.3); background:transparent; border-radius:4px; cursor:pointer; }
+.live-btn:hover { background:rgba(168,216,240,.16); }.live-status { font-family:var(--font-mono); font-size:9px; color:var(--muted); margin-right:8px; }
+.room-board { margin-bottom:2rem; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1rem 1.1rem; }.room-members { display:flex; gap:14px; overflow-x:auto; padding:3px 0 7px; }.member-card { min-width:174px; border-right:1px solid var(--border); padding-right:14px; }.member-name { font-size:12px; font-weight:700; margin-bottom:8px; }.member-grid { display:grid; grid-template-columns:repeat(14,13px); grid-auto-rows:13px; gap:3px; }.member-cell { border-radius:2px; background:#1e1e1e; cursor:default; }.member-cell:hover { outline:1px solid var(--accent); transform:scale(1.25); z-index:2; }.live-overlay { position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.76); display:flex; align-items:center; justify-content:center; }.live-box { width:min(390px,calc(100vw - 32px)); background:var(--surface2); border:1px solid var(--border2); border-radius:14px; padding:1.4rem; }.live-box h2 { font-size:18px; margin-bottom:5px; }.live-box p { font-size:12px; color:var(--muted2); margin-bottom:14px; }.live-field { width:100%; background:var(--bg); border:1px solid var(--border2); color:var(--text); border-radius:6px; padding:9px 10px; font-family:var(--font-head); margin:5px 0; outline:none; }.live-field:focus { border-color:var(--accent); }.live-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }.live-action { padding:7px 11px; border-radius:5px; border:1px solid var(--border2); background:transparent; color:var(--muted2); cursor:pointer; font-family:var(--font-mono); font-size:10px; }.live-action.primary { color:#0e0e0e; background:var(--accent); border-color:var(--accent); }.live-error { min-height:16px; color:var(--danger); font-size:11px; margin-top:5px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="left">
+    <div class="box">
+      <div class="clock-date" id="clock-date"></div>
+      <div class="clock-day" id="clock-day"></div>
+      <div class="clock-time" id="clock-time"></div>
+    </div>
+    <div class="box">
+      <div class="box-label">Focus hrs</div>
+      <div class="stat-val" id="focus-hrs">0.0</div>
+      <div class="stat-sub">lifetime completed sessions</div>
+    </div>
+    <div class="box month-box">
+      <div class="box-label">Monthly tasks</div>
+      <div class="month-tabs" id="month-tabs-container"></div>
+      <div class="month-input-row">
+        <input class="todo-input" id="month-input" placeholder="Add task for this week..." onkeydown="if(event.key==='Enter') addMonthTask()">
+        <button class="todo-add-btn" onclick="addMonthTask()">+</button>
+      </div>
+      <div class="month-scroll" id="month-list"></div>
+    </div>
+    <div class="box month-box" id="friends-panel">
+      <div class="box-label">Friends <button class="private-files-btn" style="float:right;margin:0" onclick="openFriends()">Manage</button></div>
+      <p id="friends-summary" style="font-size:11px;color:var(--muted2);margin:10px 0 0">Sign in to connect with friends.</p>
+    </div>
+  </aside>
+
+  <main class="right">
+    <div class="right-header">
+      <div class="right-title">Tracker</div>
+      <div class="diamond-wrap">
+        <span class="live-status" id="live-status">PRIVATE</span><button class="live-btn" onclick="openLiveModal()">GROUPS</button><button class="private-files-btn" onclick="openPrivateFiles()">MY FILES</button>
+        <span style="font-size:14px;">💎</span>
+        <div class="currency-bar-bg"><div class="currency-bar-fill-diamond" id="diamond-bar" style="width:0%"></div></div>
+        <div class="currency-count"><span class="diamond-val" id="diamond-count">0</span> / 800</div>
+      </div>
+    </div>
+
+    <!-- Consistency Grid -->
+    <div class="consist-wrap">
+      <div class="consist-label">Consistency — 365 days</div>
+      <div class="consist-grid" id="consist-grid"></div>
+      <div class="consist-legend">
+        <span class="leg-box leg-empty"></span><span class="leg-txt">None</span>
+        <span class="leg-box leg-low"></span><span class="leg-txt">Low</span>
+        <span class="leg-box leg-mid"></span><span class="leg-txt">Mid</span>
+        <span class="leg-box leg-high"></span><span class="leg-txt">Full</span>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline-wrap">
+      <div class="timeline-label">Today's Timeline — 5:00 AM → 5:00 AM</div>
+      <div class="timeline-inner" id="timeline-inner">
+        <div class="tl-hours-row" id="tl-hours-row"></div>
+        <div class="tl-rail"></div>
+        <div class="tl-tasks" id="tl-tasks"></div>
+      </div>
+    </div>
+
+    <div class="room-board" id="room-board" style="display:none;">
+      <div class="consist-label">Room board â€” last 28 days</div>
+      <div class="room-members" id="room-members"></div>
+      <div class="consist-legend"><span class="leg-box leg-empty"></span><span class="leg-txt">No activity</span><span class="leg-box leg-high"></span><span class="leg-txt">More completed</span><span class="leg-txt">Hover any square for completed and pending tasks.</span></div>
+    </div>
+
+    <!-- Goal Sections -->
+    <div id="sections-container"></div>
+    <div class="add-section-btn" onclick="addSection()">+ Add Event</div>
+  </main>
+</div>
+
+<!-- Calendar Modal -->
+<div class="live-overlay" id="live-overlay" style="display:none;">
+  <div class="live-box"><h2>Join a live tracker room</h2><p>Your tracker remains yours. The room board shares your daily consistency and task details with friends using the same code.</p><input class="live-field" id="live-name" maxlength="32" placeholder="Display name"><input class="live-field" id="live-code" maxlength="12" placeholder="Room code (e.g. FOCUS24)"><div class="live-error" id="live-error"></div><div class="live-actions"><button class="live-action" onclick="closeLiveModal()">Cancel</button><button class="live-action primary" onclick="joinLiveRoom()">Join room</button></div></div>
+</div>
+<div class="live-overlay" id="private-files-overlay" style="display:none;">
+  <div class="files-box"><h2>My private files</h2><p>Files remain only in this browser and are never sent to the room board, your friends, or Supabase. Add your <b>DSA War Room</b> HTML file here, then use <b>Open</b> whenever you want to study.</p><label class="files-drop">+ Add files from this computer<input id="private-file-picker" type="file" multiple onchange="addPrivateFiles(this.files)"></label><div id="private-files-list"></div><div class="live-actions"><button class="live-action" onclick="closePrivateFiles()">Close</button></div></div>
+</div>
+<div class="live-overlay" id="auth-overlay" style="display:flex;z-index:2000">
+  <div class="live-box"><h2>Together Tracker</h2><p>Sign in to keep your tracker private, synced, and shared only on your terms.</p><button class="live-action primary" style="width:100%;padding:11px" onclick="signInWithGoogle()">Continue with Google</button><p id="auth-message" style="margin-top:12px;font-size:10px"></p></div>
+</div>
+<div class="live-overlay" id="private-file-viewer" style="display:none;padding:16px;z-index:1001;">
+  <button id="private-file-close" class="live-action" onclick="closePrivateFileViewer()" aria-label="Close private file" style="position:fixed;top:18px;right:22px;z-index:1010;background:#252938;border-color:#7b8299;font-size:15px;padding:10px 14px;box-shadow:0 5px 20px #0008;">× Close file</button>
+  <div style="width:min(1280px,100%);height:min(900px,100%);display:flex;flex-direction:column;gap:10px;">
+    <div class="live-actions" style="justify-content:flex-start"><button class="live-action" onclick="closePrivateFileViewer()">← Back to My Files</button></div>
+    <iframe id="private-file-frame" title="Private file viewer" style="width:100%;flex:1;border:1px solid var(--border2);border-radius:10px;background:#fff"></iframe>
+  </div>
+</div>
+<div class="cal-overlay" id="cal-overlay" style="display:none;">
+  <div class="cal-box">
+    <div class="cal-title" id="cal-title">Set deadline</div>
+    <div class="cal-header">
+      <button class="cal-nav" id="cal-prev" onclick="calNavMonth(-1)">‹</button>
+      <div class="cal-month-year" id="cal-month-year"></div>
+      <button class="cal-nav" id="cal-next" onclick="calNavMonth(1)">›</button>
+    </div>
+    <div class="cal-dow-row">
+      <div class="cal-dow">Su</div><div class="cal-dow">Mo</div><div class="cal-dow">Tu</div>
+      <div class="cal-dow">We</div><div class="cal-dow">Th</div><div class="cal-dow">Fr</div>
+      <div class="cal-dow">Sa</div>
+    </div>
+    <div class="cal-days" id="cal-days"></div>
+    <div class="cal-btns">
+      <button class="cal-btn" onclick="closeCalendar()">Cancel</button>
+      <button class="cal-btn confirm" id="cal-confirm-btn" onclick="confirmCalendar()" disabled>Set</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="cell-tooltip" id="cell-tooltip" style="display:none;"></div>
+
+<!-- Timeline Popover -->
+<div class="tl-popover" id="tl-popover" style="display:none;"></div>
+
+<script>
+// ── STORAGE ──
+const SK = 'tracker_v1';
+function load() { try { return JSON.parse(localStorage.getItem(SK)) || {}; } catch(e) { return {}; } }
+function save(s) { try { localStorage.setItem(SK, JSON.stringify(s)); } catch(e) {} }
+
+// â”€â”€ LIVE ROOM / BACKEND â”€â”€
+let liveRoom=localStorage.getItem('tracker_room')||'', liveUser=localStorage.getItem('tracker_user')||'', liveName=localStorage.getItem('tracker_name')||'', liveHostToken=localStorage.getItem('tracker_host_token')||'', liveEvents=null, liveSyncTimer=null;
+async function liveApi(url, opts={}) { const r=await fetch(url,opts); const d=await r.json(); if(!r.ok) throw Error(d.error||'Live request failed'); return d; }
+function openLiveModal(){ document.getElementById('live-name').value=liveName; document.getElementById('live-code').value=liveRoom; document.getElementById('live-error').textContent=''; document.getElementById('live-overlay').style.display='flex'; }
+function closeLiveModal(){ document.getElementById('live-overlay').style.display='none'; }
+async function joinLiveRoom(){ try { const name=document.getElementById('live-name').value.trim(), roomCode=document.getElementById('live-code').value.trim(); const d=await liveApi('/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName:name,roomCode,userId:liveUser,hostToken:liveHostToken})}); liveRoom=d.room.code; liveUser=d.userId; liveName=name; liveHostToken=d.hostToken||''; localStorage.setItem('tracker_room',liveRoom); localStorage.setItem('tracker_user',liveUser); localStorage.setItem('tracker_name',liveName); if(liveHostToken)localStorage.setItem('tracker_host_token',liveHostToken);else localStorage.removeItem('tracker_host_token'); closeLiveModal(); startLiveRoom(); await syncLiveSnapshot(); } catch(e) { document.getElementById('live-error').textContent=e.message; } }
+function startLiveRoom(){ if(!liveRoom||!liveUser)return; document.getElementById('live-status').textContent='LIVE · '+liveRoom; document.getElementById('room-board').style.display='block'; if(liveEvents)clearInterval(liveEvents); liveEvents=setInterval(refreshRoomBoard,5000); refreshRoomBoard(); }
+function queueLiveSync(){ if(!liveRoom)return; clearTimeout(liveSyncTimer); liveSyncTimer=setTimeout(syncLiveSnapshot,350); }
+async function syncLiveSnapshot(){ if(!liveRoom||!liveUser)return; try { await liveApi('/api/snapshot',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomCode:liveRoom,userId:liveUser,consistency:load().consistency||{}})}); } catch(e) { console.warn(e); } }
+function liveDateLabel(date){ return date.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',weekday:'short'}); }
+async function refreshRoomBoard(){ if(!liveRoom)return; try { const room=await liveApi('/api/room/'+encodeURIComponent(liveRoom)); renderRoomBoard(room); } catch(e) { console.warn(e); } }
+function renderRoomBoard(room){ const host=document.getElementById('room-members'); host.innerHTML=''; const days=[]; for(let i=27;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);d.setHours(0,0,0,0);days.push(d);} room.members.forEach(member=>{ const card=document.createElement('div');card.className='member-card';card.innerHTML='<div class="member-name">'+member.name+(member.id===liveUser?' (you)':'')+'</div><div class="member-grid"></div>';const grid=card.querySelector('.member-grid');const history=room.activity?.[member.id]||{};days.forEach(date=>{const ds=date.toDateString(),entry=history[ds],cell=document.createElement('div');cell.className='member-cell';const intensity=entry?.intensity||0,style=intensityToColor(intensity);if(style)cell.style.cssText=style;cell.addEventListener('mouseenter',e=>showCellTooltip(e,date,ds,history));cell.addEventListener('mousemove',e=>moveCellTooltip(e));cell.addEventListener('mouseleave',hideCellTooltip);grid.appendChild(cell)});if(liveHostToken&&member.id!==liveUser){const remove=document.createElement('button');remove.className='member-remove';remove.textContent='Remove member';remove.onclick=()=>removeLiveMember(member.id,member.name);card.appendChild(remove)}host.appendChild(card)}); }
+async function removeLiveMember(targetId,name){ if(!confirm('Remove '+name+' from this room? They will no longer be able to join with this browser.'))return; try { await liveApi('/api/remove-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomCode:liveRoom,hostToken:liveHostToken,targetId})}); await refreshRoomBoard(); } catch(e) { alert(e.message); } }
+
+// ── DEFAULT SECTIONS ──
+// Starter example — edit, delete, or add your own sections via the UI.
+const DEFAULT_SECTIONS = [
+  { id:'example', title:'Example Goals', goals:[
+    { id:'g1', text:'Click a goal to mark it done, or the ✎ to edit it', startDate:'2026-06-28', deadline:'2026-12-31', done:false },
+    { id:'g2', text:'Click either date tag to set a start or end date', startDate:'2026-06-28', deadline:'2026-12-31', done:false },
+  ]}
+];
+
+function getSections() { const s = load(); return s.sections || DEFAULT_SECTIONS; }
+function saveSections(sec) { const s=load(); s.sections=sec; save(s); }
+function uid() { return 'id_' + Math.random().toString(36).substr(2,9); }
+
+// ── BADGE ──
+function badgeClass(dl, done) {
+  if (done) return 'badge-done';
+  const diff = (new Date(dl) - new Date()) / 86400000;
+  if (diff < 0) return 'badge-overdue';
+  if (diff < 120) return 'badge-soon';
+  return 'badge-future';
+}
+function fmtDeadline(dl) {
+  return new Date(dl + 'T00:00:00').toLocaleDateString('en-IN', { month:'short', year:'numeric' });
+}
+
+// ── CALENDAR ──
+let calCallback=null, calSelectedDate=null, calViewYear=0, calViewMonth=0;
+function openCalendar(title, current, cb) {
+  const today=new Date(); calCallback=cb; calSelectedDate=current||null;
+  if (current) { const d=new Date(current+'T00:00:00'); calViewYear=d.getFullYear(); calViewMonth=d.getMonth(); }
+  else { calViewYear=today.getFullYear(); calViewMonth=today.getMonth(); }
+  document.getElementById('cal-title').textContent=title;
+  renderCalendar();
+  document.getElementById('cal-overlay').style.display='flex';
+}
+function closeCalendar() { document.getElementById('cal-overlay').style.display='none'; calCallback=null; calSelectedDate=null; }
+function confirmCalendar() { if (calSelectedDate&&calCallback) calCallback(calSelectedDate); closeCalendar(); }
+function calNavMonth(dir) {
+  calViewMonth+=dir;
+  if (calViewMonth>11) { calViewMonth=0; calViewYear++; }
+  if (calViewMonth<0) { calViewMonth=11; calViewYear--; }
+  renderCalendar();
+}
+function renderCalendar() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const mNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-year').textContent=mNames[calViewMonth]+' '+calViewYear;
+  const dc=document.getElementById('cal-days'); dc.innerHTML='';
+  const firstDay=new Date(calViewYear,calViewMonth,1).getDay();
+  const dim=new Date(calViewYear,calViewMonth+1,0).getDate();
+  for(let i=0;i<firstDay;i++){const e=document.createElement('div');e.className='cal-day cal-empty';dc.appendChild(e);}
+  for(let d=1;d<=dim;d++){
+    const cd=new Date(calViewYear,calViewMonth,d); cd.setHours(0,0,0,0);
+    const ds=calViewYear+'-'+String(calViewMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const isPast=cd<today, isToday=cd.getTime()===today.getTime(), isSel=ds===calSelectedDate;
+    const cell=document.createElement('div');
+    let cls='cal-day';
+    if(isPast&&!isToday)cls+=' cal-past'; if(isToday)cls+=' cal-today'; if(isSel)cls+=' cal-selected';
+    cell.className=cls; cell.textContent=d;
+    if(!isPast||isToday) cell.addEventListener('click',()=>{ calSelectedDate=ds; document.getElementById('cal-confirm-btn').disabled=false; renderCalendar(); });
+    dc.appendChild(cell);
+  }
+  const isCur=calViewYear===today.getFullYear()&&calViewMonth===today.getMonth();
+  document.getElementById('cal-prev').style.opacity=isCur?'0.3':'1';
+  document.getElementById('cal-prev').style.pointerEvents=isCur?'none':'auto';
+  document.getElementById('cal-confirm-btn').disabled=!calSelectedDate;
+}
+
+// ── RENDER SECTIONS ──
+function renderSections() {
+  const sections=getSections(), container=document.getElementById('sections-container');
+  container.innerHTML='';
+  sections.forEach((sec,si)=>{
+    const wrap=document.createElement('div'); wrap.className='section';
+    const head=document.createElement('div'); head.className='section-head';
+    head.innerHTML=`
+      <div class="section-title-wrap">
+        <div class="section-title" id="stitle_${sec.id}" ondblclick="editSectionTitle(${si})">${sec.title}</div>
+      </div>
+      <div class="section-actions">
+        <button class="sec-btn add" onclick="addGoal(${si})">+ Goal</button>
+        <button class="sec-btn del" onclick="deleteSection(${si})">Remove</button>
+      </div>`;
+    wrap.appendChild(head);
+    sec.goals.forEach((goal,gi)=>{
+      const row=document.createElement('div'); row.className='goal-row';
+      row.innerHTML=`
+        <div class="checkbox ${goal.done?'checked':''}" onclick="toggleGoal(${si},${gi})"></div>
+        <div class="goal-text ${goal.done?'done':''}" onclick="toggleGoal(${si},${gi})">${goal.text}</div>
+        <span class="goal-edit-btn" onclick="editGoalText(${si},${gi})">✎</span>
+        <div class="badge-range">
+          <div class="badge badge-start" onclick="editStartDate(${si},${gi})">${goal.startDate?fmtDeadline(goal.startDate):'Set start'}</div>
+          <span class="badge-arrow">→</span>
+          <div class="badge ${badgeClass(goal.deadline,goal.done)}" onclick="editDeadline(${si},${gi})">${fmtDeadline(goal.deadline)}</div>
+        </div>
+        <span class="goal-del-btn" onclick="deleteGoal(${si},${gi})">×</span>`;
+      wrap.appendChild(row);
+    });
+    container.appendChild(wrap);
+  });
+}
+
+function toggleGoal(si,gi) {
+  const s=getSections(); s[si].goals[gi].done=!s[si].goals[gi].done; saveSections(s); renderSections();
+}
+function editSectionTitle(si) {
+  const sections=getSections(), sec=sections[si];
+  const el=document.getElementById('stitle_'+sec.id); if(!el)return;
+  const input=document.createElement('input'); input.className='section-title-input'; input.value=sec.title;
+  el.replaceWith(input); input.focus();
+  const sv=()=>{ sections[si].title=input.value.trim()||sec.title; saveSections(sections); renderSections(); };
+  input.onblur=sv; input.onkeydown=e=>{ if(e.key==='Enter')input.blur(); if(e.key==='Escape'){input.value=sec.title;input.blur();} };
+}
+function editGoalText(si,gi) {
+  const sections=getSections(), goal=sections[si].goals[gi];
+  const rows=document.querySelectorAll('.goal-row');
+  let count=0; for(let s=0;s<si;s++)count+=sections[s].goals.length; count+=gi;
+  const row=rows[count]; if(!row)return;
+  const textEl=row.querySelector('.goal-text');
+  const input=document.createElement('input'); input.className='goal-text-input'; input.value=goal.text;
+  textEl.replaceWith(input); input.focus();
+  const sv=()=>{ sections[si].goals[gi].text=input.value.trim()||goal.text; saveSections(sections); renderSections(); };
+  input.onblur=sv; input.onkeydown=e=>{ if(e.key==='Enter')input.blur(); if(e.key==='Escape'){input.value=goal.text;input.blur();} };
+}
+function editDeadline(si,gi) {
+  const sections=getSections(), goal=sections[si].goals[gi];
+  openCalendar('End date: '+goal.text, goal.deadline, val=>{
+    sections[si].goals[gi].deadline=val;
+    saveSections(sections); renderSections();
+  });
+}
+function editStartDate(si,gi) {
+  const sections=getSections(), goal=sections[si].goals[gi];
+  openCalendar('Start date: '+goal.text, goal.startDate||null, val=>{
+    sections[si].goals[gi].startDate=val;
+    saveSections(sections); renderSections();
+  });
+}
+function addGoal(si) {
+  const sections=getSections();
+  const todayStr=new Date().toISOString().slice(0,10);
+  sections[si].goals.push({id:uid(),text:'New goal',startDate:todayStr,deadline:'2027-12-31',done:false});
+  saveSections(sections); renderSections();
+  setTimeout(()=>editGoalText(si,sections[si].goals.length-1),50);
+}
+function deleteGoal(si,gi) {
+  const sections=getSections(); sections[si].goals.splice(gi,1); saveSections(sections); renderSections();
+}
+function addSection() {
+  const sections=getSections();
+  sections.push({id:uid(),title:'New timeline — double-click to rename',goals:[]});
+  saveSections(sections); renderSections();
+  setTimeout(()=>editSectionTitle(sections.length-1),50);
+}
+function deleteSection(si) {
+  const sections=getSections(); if(!confirm('Remove this timeline?'))return;
+  sections.splice(si,1); saveSections(sections); renderSections();
+}
+
+// ── CONSISTENCY GRID ──
+// Intensity: 0→1 based on completed/total timeline task hours
+// Color: crystal white, brightness scales with intensity
+
+function intensityToColor(v) {
+  // v: 0→1
+  if (v <= 0) return null;
+  // Crystal diamond palette: dim blue-white → bright white glow
+  const alpha = 0.15 + v * 0.75; // 0.15 to 0.9
+  const glow = v > 0.8 ? `box-shadow: 0 0 ${Math.round(v*6)}px rgba(210,230,255,${v*0.7});` : '';
+  return `background: rgba(210,225,255,${alpha.toFixed(2)}); ${glow}`;
+}
+
+function renderConsistencyGrid() {
+  const s=load(), consistency=s.consistency||{};
+  const grid=document.getElementById('consist-grid'); grid.innerHTML='';
+  const today=new Date(); today.setHours(0,0,0,0);
+  const start=new Date(today); start.setDate(today.getDate()-364);
+  const startDow=start.getDay(); start.setDate(start.getDate()-startDow);
+  const totalDays=Math.ceil((today-start)/86400000)+1;
+  const totalCols=Math.ceil(totalDays/7);
+
+  for(let w=0;w<totalCols;w++){
+    const col=document.createElement('div'); col.className='consist-col';
+    for(let d=0;d<7;d++){
+      const date=new Date(start); date.setDate(start.getDate()+w*7+d); date.setHours(0,0,0,0);
+      const cell=document.createElement('div'); cell.className='consist-cell';
+      const ds=date.toDateString();
+      const isFuture=date>today;
+      const isBefore=date<new Date(today.getTime()-364*86400000);
+      const isToday=ds===today.toDateString();
+      if(isToday) cell.classList.add('today');
+      if(!isFuture&&!isBefore){
+        const entry=consistency[ds];
+        if(entry){
+          const intensity=typeof entry==='object'?( entry.intensity!==undefined ? entry.intensity : (entry.status==='full'?1:entry.status==='half'?0.5:0) ):0;
+          const style=intensityToColor(intensity);
+          if(style) cell.style.cssText=style;
+        }
+      }
+      if(isFuture||isBefore) cell.style.opacity='0.12';
+      cell.addEventListener('mouseenter',e=>showCellTooltip(e,date,ds,consistency));
+      cell.addEventListener('mousemove',e=>moveCellTooltip(e));
+      cell.addEventListener('mouseleave',hideCellTooltip);
+      col.appendChild(cell);
+    }
+    grid.appendChild(col);
+  }
+}
+
+function showCellTooltip(e,date,ds,consistency){
+  const tooltip=document.getElementById('cell-tooltip');
+  const entry=consistency[ds];
+  const dateLabel=date.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',weekday:'short'});
+  let html=`<div class="tooltip-date">${dateLabel}</div>`;
+  if(!entry){ html+=`<div class="tooltip-empty">No data</div>`; }
+  else {
+    const intensity=typeof entry==='object'?( entry.intensity!==undefined?entry.intensity:(entry.status==='full'?1:entry.status==='half'?0.5:0) ):0;
+    html+=`<div style="color:var(--muted2);font-size:9px;">Intensity: ${(intensity*100).toFixed(0)}%</div>`;
+    const done=typeof entry==='object'?(entry.done||[]):[];
+    const pending=typeof entry==='object'?(entry.pending||[]):[];
+    done.forEach(t=>{ html+=`<div class="tooltip-done">✓ ${t}</div>`; });
+    pending.forEach(t=>{ html+=`<div class="tooltip-pending">✗ ${t}</div>`; });
+  }
+  tooltip.innerHTML=html; tooltip.style.display='block'; moveCellTooltip(e);
+}
+function moveCellTooltip(e){
+  const t=document.getElementById('cell-tooltip');
+  let x=e.clientX+14, y=e.clientY+14;
+  const r=t.getBoundingClientRect();
+  if(x+r.width>window.innerWidth-10)x=e.clientX-r.width-10;
+  if(y+r.height>window.innerHeight-10)y=e.clientY-r.height-10;
+  t.style.left=x+'px'; t.style.top=y+'px';
+}
+function hideCellTooltip(){ document.getElementById('cell-tooltip').style.display='none'; }
+
+// Tooltip for hovering a timeline task bracket — shows exact start/end/duration
+function showTaskTimeTooltip(e,startLabel,endLabel,durLabel){
+  const tooltip=document.getElementById('cell-tooltip');
+  tooltip.innerHTML=`<div class="tooltip-date">${startLabel} – ${endLabel}</div><div style="color:var(--muted2);font-size:9px;">${durLabel}</div>`;
+  tooltip.style.display='block'; moveCellTooltip(e);
+}
+
+function pruneConsistency(){
+  const s=load(); if(!s.consistency)return;
+  const keys=Object.keys(s.consistency).map(k=>({key:k,t:new Date(k).getTime()})).filter(x=>!isNaN(x.t)).sort((a,b)=>a.t-b.t);
+  if(keys.length>365){ keys.slice(0,keys.length-365).forEach(x=>delete s.consistency[x.key]); save(s); }
+}
+
+// ── TIMELINE ──
+// 24 hours: 5AM→5AM. Positions stored as fractions 0→1 of total width.
+// minFrac: 0=:00, 0.25=:15, 0.5=:30, 0.75=:45
+
+const TL_HOURS = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1,2,3,4];
+const TL_N = TL_HOURS.length; // 24
+
+function fmtHourShort(h){ const ampm=h>=12?'PM':'AM'; const h12=h%12||12; return h12+ampm; }
+
+// Convert a 0→1 timeline fraction back into a real clock time label, e.g. "10:15 AM".
+// Needed because tasks can start/end on quarter-hours (15/30/45) that don't land
+// on a printed hour tick, so hovering the task is the only way to see the exact time.
+function fracToTimeLabel(frac){
+  const totalMin=Math.round(frac*TL_N*60);
+  // frac===1 is the 5AM boundary of the *next* day (only ever an endFrac value)
+  const h12last=TL_HOURS[0]%12||12, ampmLast=TL_HOURS[0]>=12?'PM':'AM';
+  if(totalMin>=TL_N*60) return `${h12last}:00 ${ampmLast}`;
+  const hourIdx=Math.floor(totalMin/60);
+  const min=totalMin%60;
+  const realHour=TL_HOURS[hourIdx];
+  const ampm=realHour>=12?'PM':'AM';
+  const h12=realHour%12||12;
+  return `${h12}:${String(min).padStart(2,'0')} ${ampm}`;
+}
+
+// fraction (0→1) for hourIdx + minFrac
+function timeToFrac(hourIdx, minFrac=0){ return (hourIdx + minFrac) / TL_N; }
+
+let tlPendingBegin = null;
+let activePopover = null;
+
+function getTlTasks(){
+  const raw=load().tlTasks || [];
+  // Drop corrupted/legacy entries: NaN fractions, out-of-range fractions,
+  // or zero/negative-width slots. These can't be created through the normal
+  // Begin/End UI (setEnd rejects endFrac<=startFrac) but old/imported data
+  // could contain them, and they render as an orphan checkbox with no
+  // visible bracket above it since a near-zero-width box collapses to invisible
+  // while its independently-centered checkbox still draws at full size.
+  return raw.filter(t=>
+    t && typeof t.startFrac==='number' && typeof t.endFrac==='number' &&
+    !isNaN(t.startFrac) && !isNaN(t.endFrac) &&
+    t.startFrac>=0 && t.endFrac<=1 && t.endFrac>t.startFrac
+  );
+}
+function saveTlTasks(t){
+  // A computer can sleep through the 5 AM timer. Never let an old timeline
+  // be written back into the new day when it wakes up.
+  if(load().lastDay!==getDayKey(new Date())){
+    checkDayRollover();
+    buildTimeline(); updateFocusHrs(); renderConsistencyGrid(); updateDiamonds();
+    return false;
+  }
+  const s=load(); s.tlTasks=t; save(s); updateFocusHrs(); saveTodayConsistency(); return true;
+}
+
+function buildTimeline(){
+  const row=document.getElementById('tl-hours-row');
+  row.innerHTML='';
+  TL_HOURS.forEach((h,i)=>{
+    const block=document.createElement('div');
+    block.className='tl-hour-block'+(i===0?' edge-hour':'');
+    block.innerHTML=`<div class="tl-hour-label">${fmtHourShort(h)}</div>`;
+    block.addEventListener('click', e=>{ e.stopPropagation(); openTlPopover(i, 0, e, block); });
+    row.appendChild(block);
+  });
+  // Extra label at the very end of the row: "5AM" of the *next* day, marking
+  // the true end of the 5AM→5AM day. It isn't a 24th hour cell (TL_N stays 24,
+  // so all the existing fraction math is untouched) — it's just a label+click
+  // target pinned to frac=1.0, the one point on the rail you couldn't
+  // previously select (the closest you could get was 4:45 AM).
+  const endBlock=document.createElement('div');
+  endBlock.className='tl-hour-end-block';
+  endBlock.innerHTML=`<div class="tl-hour-label">${fmtHourShort(TL_HOURS[0])}</div>`;
+  endBlock.addEventListener('click', e=>{ e.stopPropagation(); openTlPopover(TL_N, 0, e, endBlock); });
+  row.appendChild(endBlock);
+  renderTlTasks();
+}
+
+function openTlPopover(hourIdx, minFrac, e, anchorEl){
+  closePopover();
+  const pop=document.getElementById('tl-popover');
+  pop.innerHTML='';
+
+  const isFirst=(hourIdx===0&&minFrac===0);
+  const isEndOfDay=(hourIdx===TL_N); // the new "next-day 5AM" marker — End-only, no sub-minutes
+  const isLast=isEndOfDay;
+
+  if(!isLast){
+    const btnB=document.createElement('button');
+    btnB.className='tl-pop-btn begin'; btnB.textContent='▶ Begin';
+    btnB.addEventListener('click', e=>{ e.stopPropagation(); setBegin(hourIdx,minFrac); closePopover(); });
+    pop.appendChild(btnB);
+  }
+  if(!isFirst){
+    const btnE=document.createElement('button');
+    btnE.className='tl-pop-btn end'; btnE.textContent='■ End';
+    btnE.addEventListener('click', e=>{ e.stopPropagation(); setEnd(hourIdx,minFrac); closePopover(); });
+    pop.appendChild(btnE);
+  }
+  if(!isEndOfDay){
+    const btnS=document.createElement('button');
+    btnS.className='tl-pop-btn'; btnS.textContent='⊕ Specific';
+    btnS.addEventListener('click', e=>{ e.stopPropagation(); btnS.remove(); showSpecific(hourIdx, pop); });
+    pop.appendChild(btnS);
+  }
+
+  // Position using fixed coords from click
+  pop.style.display='flex'; pop.style.flexDirection='column';
+  pop.style.left=e.clientX+'px'; pop.style.top=(e.clientY-10)+'px';
+  requestAnimationFrame(()=>{
+    const r=pop.getBoundingClientRect();
+    if(r.bottom>window.innerHeight-8) pop.style.top=(e.clientY-r.height-8)+'px';
+    if(r.right>window.innerWidth-8) pop.style.left=(e.clientX-r.width)+'px';
+  });
+  activePopover={hourIdx,minFrac};
+}
+
+function showSpecific(hourIdx, pop){
+  const existing=pop.querySelector('.tl-zoom-row');
+  if(existing)existing.remove();
+  const zoomRow=document.createElement('div'); zoomRow.className='tl-zoom-row';
+  [15,30,45].forEach(min=>{
+    const btn=document.createElement('button');
+    btn.className='tl-zoom-min'; btn.textContent=':'+String(min).padStart(2,'0');
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      zoomRow.querySelectorAll('.tl-zoom-min').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      const mf=min/60;
+      pop.querySelectorAll('.tl-pop-btn.begin').forEach(b=>b.remove());
+      pop.querySelectorAll('.tl-pop-btn.end').forEach(b=>b.remove());
+      const isFirst=(hourIdx===0&&mf===0), isLast=(hourIdx===TL_N-1&&mf===0);
+      if(!isLast){
+        const nb=document.createElement('button'); nb.className='tl-pop-btn begin';
+        nb.textContent=`▶ Begin ${fmtHourShort(TL_HOURS[hourIdx])}:${String(min).padStart(2,'0')}`;
+        nb.addEventListener('click', ev=>{ ev.stopPropagation(); setBegin(hourIdx,mf); closePopover(); });
+        pop.insertBefore(nb, pop.firstChild);
+      }
+      if(!isFirst){
+        const ne=document.createElement('button'); ne.className='tl-pop-btn end';
+        ne.textContent=`■ End ${fmtHourShort(TL_HOURS[hourIdx])}:${String(min).padStart(2,'0')}`;
+        ne.addEventListener('click', ev=>{ ev.stopPropagation(); setEnd(hourIdx,mf); closePopover(); });
+        const bIdx=pop.querySelectorAll('.tl-pop-btn.begin').length;
+        pop.insertBefore(ne, pop.children[bIdx]);
+      }
+    });
+    zoomRow.appendChild(btn);
+  });
+  pop.appendChild(zoomRow);
+}
+
+function closePopover(){
+  const pop=document.getElementById('tl-popover');
+  pop.style.display='none'; pop.innerHTML='';
+  activePopover=null;
+  renderTlTasks();
+}
+
+function setBegin(hourIdx, minFrac){
+  tlPendingBegin={hourIdx,minFrac};
+  renderTlTasks();
+}
+
+function setEnd(hourIdx, minFrac){
+  if(!tlPendingBegin){ alert('Choose a Begin point first.'); return; }
+  const startFrac=timeToFrac(tlPendingBegin.hourIdx, tlPendingBegin.minFrac);
+  const endFrac=timeToFrac(hourIdx, minFrac);
+  if(endFrac<=startFrac){ alert('End must be after Begin.'); return; }
+  const tasks=getTlTasks();
+  for(const t of tasks){
+    if(startFrac<t.endFrac&&endFrac>t.startFrac){ alert('This slot overlaps with an existing task.'); return; }
+  }
+  tasks.push({ id:uid(), startFrac, endFrac, text:'', done:false });
+  saveTlTasks(tasks);
+  tlPendingBegin=null;
+  renderTlTasks();
+}
+
+function renderTlTasks(){
+  const container=document.getElementById('tl-tasks');
+  container.innerHTML='';
+  const tasks=getTlTasks();
+
+  // Pending begin marker
+  if(tlPendingBegin){
+    const frac=timeToFrac(tlPendingBegin.hourIdx, tlPendingBegin.minFrac);
+    const marker=document.createElement('div');
+    marker.className='tl-begin-marker';
+    marker.style.left=(frac*100)+'%';
+    container.appendChild(marker);
+  }
+
+  tasks.forEach((task,i)=>{
+    const leftPct=(task.startFrac*100).toFixed(3)+'%';
+    const widthPct=((task.endFrac-task.startFrac)*100).toFixed(3)+'%';
+
+    // Wrapper spans the slot
+    const wrap=document.createElement('div');
+    wrap.className='tl-task-wrapper'+(task.done?' completed':'');
+    wrap.style.left=leftPct; wrap.style.width=widthPct;
+
+    // Box (above rail) — holds the SVG bracket + input + delete btn
+    const box=document.createElement('div');
+    box.className='tl-task-box';
+
+    const svgNS='http://www.w3.org/2000/svg';
+    const svg=document.createElementNS(svgNS,'svg');
+    svg.setAttribute('class','tl-task-bracket');
+    const path=document.createElementNS(svgNS,'path');
+    svg.appendChild(path);
+
+    const inp=document.createElement('input');
+    inp.className='tl-task-input'; inp.type='text';
+    inp.value=task.text; inp.placeholder='Task…';
+    inp.addEventListener('input',()=>{ tasks[i].text=inp.value; saveTlTasks(tasks); });
+    inp.addEventListener('click',e=>e.stopPropagation());
+
+    const del=document.createElement('div');
+    del.className='tl-task-del'; del.textContent='×';
+    del.addEventListener('click',e=>{
+      e.stopPropagation();
+      // The hovered box is about to be removed from the DOM (via renderTlTasks'
+      // innerHTML wipe), so it will never fire a natural mouseleave — the
+      // tooltip would otherwise stay stuck on screen until something else
+      // hides it. Hide it explicitly here.
+      hideCellTooltip();
+      tasks.splice(i,1); saveTlTasks(tasks); renderTlTasks();
+    });
+
+    box.appendChild(svg); box.appendChild(inp); box.appendChild(del);
+
+    // Hover tooltip with exact start/end time — needed because tasks can start/end
+    // on quarter-hours (e.g. 10:15, 2:30, 8:45) that have no printed hour tick,
+    // so this is the only way to see the real scheduled time of the session.
+    const startLabel=fracToTimeLabel(task.startFrac);
+    const endLabel=fracToTimeLabel(task.endFrac);
+    const durMin=Math.round((task.endFrac-task.startFrac)*TL_N*60);
+    const durLabel=durMin>=60 ? `${(durMin/60).toFixed(durMin%60===0?0:1)}h` : `${durMin}m`;
+    box.addEventListener('mouseenter',e=>showTaskTimeTooltip(e,startLabel,endLabel,durLabel));
+    box.addEventListener('mousemove',e=>moveCellTooltip(e));
+    box.addEventListener('mouseleave',hideCellTooltip);
+
+    // Checkbox below labels — rounded bracket "[ ]" drawn via SVG
+    const cb=document.createElement('div');
+    cb.className='tl-task-cb'+(task.done?' done':'');
+    cb.innerHTML=cbBracketSvg();
+    cb.addEventListener('click',e=>{ e.stopPropagation(); tasks[i].done=!tasks[i].done; saveTlTasks(tasks); renderTlTasks(); });
+
+    wrap.appendChild(box); wrap.appendChild(cb);
+    container.appendChild(wrap);
+
+    // Draw the rounded open-bottom bracket now that the box has real pixel width
+    requestAnimationFrame(()=>drawBracketPath(box, path));
+  });
+}
+
+// Rounded "[ ]" checkbox bracket as inline SVG
+function cbBracketSvg(){
+  const r=2.5;
+  return `<svg width="16" height="16" viewBox="0 0 16 16">
+    <path d="M 6.5 1.5 L ${1+r} 1.5 Q 1.5 1.5 1.5 ${1+r} L 1.5 ${15-r} Q 1.5 14.5 ${1+r} 14.5 L 6.5 14.5
+             M 9.5 1.5 L ${15-r} 1.5 Q 14.5 1.5 14.5 ${1+r} L 14.5 ${15-r} Q 14.5 14.5 ${15-r} 14.5 L 9.5 14.5" />
+  </svg>`;
+}
+
+// Rounded open-bottom bracket: ⌐‾‾‾‾‾⌐ with smooth corners, sized to the box's actual pixel dims
+function drawBracketPath(box, pathEl){
+  const w=box.clientWidth, h=box.clientHeight;
+  if(!w||!h) return;
+  const r=Math.min(5, w/2-1, h-2); // corner radius, capped so it never overlaps
+  const top=1, bottom=h-1, left=1, right=w-1;
+  const d=`M ${left} ${bottom}
+            L ${left} ${top+r}
+            Q ${left} ${top} ${left+r} ${top}
+            L ${right-r} ${top}
+            Q ${right} ${top} ${right} ${top+r}
+            L ${right} ${bottom}`;
+  pathEl.setAttribute('d', d);
+  pathEl.closest('svg').setAttribute('viewBox', `0 0 ${w} ${h}`);
+  pathEl.closest('svg').setAttribute('width', w);
+  pathEl.closest('svg').setAttribute('height', h);
+}
+
+// ── FOCUS HRS (from completed timeline tasks) ──
+function updateFocusHrs(){
+  const tasks=getTlTasks();
+  let todayMinutes=0;
+  tasks.forEach(t=>{ if(t.done) todayMinutes+=(t.endFrac-t.startFrac)*TL_N*60; });
+  // Completed sessions become permanent at the next 5 AM rollover.
+  const lifetimeMinutes=Number(load().lifetimeFocusMinutes||0);
+  document.getElementById('focus-hrs').textContent=((lifetimeMinutes+todayMinutes)/60).toFixed(1);
+}
+
+// ── CONSISTENCY / INTENSITY ──
+function saveTodayConsistency(){
+  const s=load();
+  const tasks=getTlTasks();
+  let doneHrs=0, totalHrs=0;
+  tasks.forEach(t=>{
+    const hrs=(t.endFrac-t.startFrac)*TL_N;
+    totalHrs+=hrs;
+    if(t.done) doneHrs+=hrs;
+  });
+  const intensity=totalHrs>0 ? doneHrs/totalHrs : 0;
+  if(!s.consistency) s.consistency={};
+  // Use the same 5AM-anchored day key as checkDayRollover/getDayKey, NOT a plain
+  // midnight-anchored toDateString() — otherwise a session logged between
+  // midnight and 5AM gets saved under tomorrow's calendar date here, while
+  // rollover later archives it under yesterday's date, splitting one
+  // logical day across two grid cells and showing stale/wrong intensity.
+  const todayKey=getDayKey(new Date());
+  s.consistency[todayKey]={
+    intensity,
+    done: tasks.filter(t=>t.done).map(t=>t.text||'(unnamed)'),
+    pending: tasks.filter(t=>!t.done).map(t=>t.text||'(unnamed)')
+  };
+  save(s);
+  renderConsistencyGrid();
+  updateDiamonds();
+  queueAccountSync();
+}
+
+function updateDiamonds(){
+  const s=load(), consistency=s.consistency||{};
+  let diamonds=0;
+  Object.values(consistency).forEach(entry=>{
+    const intensity=typeof entry==='object'?(entry.intensity!==undefined?entry.intensity:(entry.status==='full'?1:entry.status==='half'?0.5:0)):0;
+    diamonds+=intensity; // max 1 per day
+  });
+  diamonds=Math.max(0,Math.min(800,Math.round(diamonds*10)/10));
+  document.getElementById('diamond-count').textContent=diamonds%1===0?diamonds:diamonds.toFixed(1);
+  document.getElementById('diamond-bar').style.width=(Math.max(0,diamonds)/800*100)+'%';
+}
+
+// ── MONTHLY TASKS ──
+function getCurrentWeek(){ const d=new Date().getDate(); if(d<=7)return 0; if(d<=14)return 1; if(d<=21)return 2; return 3; }
+function getWeekLabel(w){
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  const starts=[1,8,15,22], ends=[7,14,21,new Date(y,m+1,0).getDate()];
+  const ms=now.toLocaleDateString('en-IN',{month:'short'});
+  return `${ms} ${starts[w]}–${ends[w]}`;
+}
+let activeWeek=getCurrentWeek();
+function getMonthTasks(){ const raw=load().monthTasks||[[],[],[],[]]; return raw.map(w=>w.map(t=>typeof t==='string'?{text:t,done:false}:t)); }
+function saveMonthTasks(t){ const s=load(); s.monthTasks=t; save(s); }
+function buildMonthTabs(){
+  const c=document.getElementById('month-tabs-container'); c.innerHTML='';
+  for(let i=0;i<4;i++){
+    const btn=document.createElement('button');
+    btn.className='week-tab'+(i===activeWeek?' active':'');
+    btn.textContent=getWeekLabel(i);
+    btn.addEventListener('click',()=>{ activeWeek=i; buildMonthTabs(); renderMonthTasks(); });
+    c.appendChild(btn);
+  }
+}
+function renderMonthTasks(){
+  const tasks=getMonthTasks(), list=document.getElementById('month-list');
+  list.innerHTML='';
+  (tasks[activeWeek]||[]).forEach((task,i)=>{
+    const item=document.createElement('div'); item.className='month-item';
+    item.innerHTML=`<div class="month-cb ${task.done?'done':''}"></div><div class="month-item-text ${task.done?'done':''}">${task.text}</div><div class="month-del" onclick="deleteMonthTask(${i},event)">×</div>`;
+    item.querySelector('.month-cb').addEventListener('click',e=>{e.stopPropagation();toggleMonthTask(i);});
+    item.querySelector('.month-item-text').addEventListener('click',()=>toggleMonthTask(i));
+    list.appendChild(item);
+  });
+}
+function toggleMonthTask(i){ const t=getMonthTasks(); t[activeWeek][i].done=!t[activeWeek][i].done; saveMonthTasks(t); renderMonthTasks(); }
+function addMonthTask(){
+  const input=document.getElementById('month-input'), text=input.value.trim(); if(!text)return;
+  const t=getMonthTasks(); t[activeWeek].push({text,done:false}); saveMonthTasks(t); input.value=''; renderMonthTasks();
+}
+function deleteMonthTask(i,e){ e.stopPropagation(); const t=getMonthTasks(); t[activeWeek].splice(i,1); saveMonthTasks(t); renderMonthTasks(); }
+
+// ── CLOCK ──
+function updateClock(){
+  const now=new Date();
+  document.getElementById('clock-date').textContent=now.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('clock-day').textContent=now.toLocaleDateString('en-IN',{weekday:'long'});
+  let h=now.getHours(); const ampm=h>=12?'PM':'AM'; h=h%12||12;
+  document.getElementById('clock-time').textContent=h+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0')+' '+ampm;
+}
+
+// ── DAY ROLLOVER ──
+function checkDayRollover(){
+  const s=load();
+  // Day = 5AM to 5AM
+  const now=new Date();
+  const dayKey=getDayKey(now);
+  let changed=false;
+  if(s.lastDay && s.lastDay!==dayKey){
+    // Archive yesterday's timeline intensity
+    const tasks=s.tlTasks||[];
+    if(tasks.length>0){
+      let doneHrs=0,totalHrs=0;
+      tasks.forEach(t=>{ const hrs=(t.endFrac-t.startFrac)*TL_N; totalHrs+=hrs; if(t.done)doneHrs+=hrs; });
+      const intensity=totalHrs>0?doneHrs/totalHrs:0;
+      if(!s.consistency)s.consistency={};
+      s.consistency[s.lastDay]={ intensity, done:tasks.filter(t=>t.done).map(t=>t.text||'(unnamed)'), pending:tasks.filter(t=>!t.done).map(t=>t.text||'(unnamed)') };
+      s.lifetimeFocusMinutes=Math.round(Number(s.lifetimeFocusMinutes||0)+doneHrs*60);
+    }
+    s.tlTasks=[];
+    changed=true;
+    // Month reset
+    const lastDate=new Date(s.lastDay+'T05:00:00');
+    if(lastDate.getMonth()!==now.getMonth()||lastDate.getFullYear()!==now.getFullYear()){
+      s.monthTasks=[[],[],[],[]]; activeWeek=0;
+    }
+  }
+  if(s.lastDay!==dayKey){ s.lastDay=dayKey; changed=true; }
+  if(changed) save(s);
+  pruneConsistency();
+  return changed;
+}
+
+function getDayKey(date){
+  // Day starts at 5AM — if before 5AM, it belongs to previous day
+  const d=new Date(date);
+  if(d.getHours()<5) d.setDate(d.getDate()-1);
+  d.setHours(5,0,0,0);
+  return d.toDateString();
+}
+
+// Close popover on outside click
+document.addEventListener('click', e=>{
+  const pop=document.getElementById('tl-popover');
+  if(pop.style.display!=='none' && !pop.contains(e.target)){
+    closePopover();
+  }
+});
+
+// ── INIT ──
+checkDayRollover();
+renderSections();
+buildMonthTabs();
+renderMonthTasks();
+renderConsistencyGrid();
+buildTimeline();
+updateFocusHrs();
+updateDiamonds();
+updateClock();
+if(liveRoom&&liveUser) startLiveRoom();
+setInterval(updateClock,1000);
+// Clean up at the next minute even if the page stays open overnight.
+setInterval(()=>{
+  if(checkDayRollover()){
+    buildTimeline(); updateFocusHrs(); renderConsistencyGrid(); updateDiamonds();
+  }
+},60000);
+</script>
+<script>
+// PRIVATE FILE LIBRARY — IndexedDB only. Nothing below calls the room API or Supabase.
+const PRIVATE_FILES_DB='together-tracker-private-files', PRIVATE_FILES_STORE='files';
+function privateFileOwner(){let localId=localStorage.getItem('tracker_private_file_owner');if(!localId){localId=crypto.randomUUID();localStorage.setItem('tracker_private_file_owner',localId)}return liveUser?'room-user:'+liveUser:'browser-user:'+localId}
+function privateFilesDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(PRIVATE_FILES_DB,1);req.onupgradeneeded=()=>{const store=req.result.createObjectStore(PRIVATE_FILES_STORE,{keyPath:'id'});store.createIndex('owner','owner',{unique:false})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+function txResult(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
+async function privateFiles(){const db=await privateFilesDb();const tx=db.transaction(PRIVATE_FILES_STORE,'readonly');const files=await txResult(tx.objectStore(PRIVATE_FILES_STORE).index('owner').getAll(privateFileOwner()));db.close();return files.sort((a,b)=>b.createdAt-a.createdAt)}
+async function privateFile(id){const db=await privateFilesDb();const tx=db.transaction(PRIVATE_FILES_STORE,'readonly');const record=await txResult(tx.objectStore(PRIVATE_FILES_STORE).get(id));db.close();return record&&record.owner===privateFileOwner()?record:null}
+async function renderPrivateFiles(){const host=document.getElementById('private-files-list');if(!host)return;host.innerHTML='';try{const files=await privateFiles();if(!files.length){host.innerHTML='<div class="files-empty">No private files yet. Add <b>dsa-war-room.html</b> to keep it one click away.</div>';return}files.forEach(file=>{const row=document.createElement('div');row.className='private-file-row';const info=document.createElement('div');info.className='private-file-name';info.textContent=file.name;const meta=document.createElement('div');meta.className='private-file-meta';meta.textContent=`${Math.max(1,Math.round(file.size/1024))} KB · added ${new Date(file.createdAt).toLocaleDateString()}`;info.appendChild(meta);const open=document.createElement('button');open.className='private-file-action';open.textContent='Open';open.onclick=()=>openPrivateFile(file.id);const remove=document.createElement('button');remove.className='private-file-action delete';remove.textContent='Delete';remove.onclick=()=>deletePrivateFile(file.id,file.name);row.append(info,open,remove);host.appendChild(row)})}catch(e){host.innerHTML='<div class="files-empty">Could not load private files.</div>'}}
+function openPrivateFiles(){document.getElementById('private-files-overlay').style.display='flex';renderPrivateFiles()}
+function closePrivateFiles(){document.getElementById('private-files-overlay').style.display='none'}
+async function addPrivateFiles(list){try{const files=[...list];if(!files.length)return;if(files.some(file=>file.size>15*1024*1024))throw Error('Each file must be smaller than 15 MB.');const db=await privateFilesDb();const tx=db.transaction(PRIVATE_FILES_STORE,'readwrite');const store=tx.objectStore(PRIVATE_FILES_STORE);files.forEach(file=>store.put({id:crypto.randomUUID(),owner:privateFileOwner(),name:file.name,type:file.type,size:file.size,blob:file,createdAt:Date.now()}));await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();document.getElementById('private-file-picker').value='';renderPrivateFiles()}catch(e){alert(e.message||'Could not add those files.')}}
+let privateViewerUrl=null;
+async function openPrivateFile(id){const file=await privateFile(id);if(!file)return alert('That private file is no longer available.');if(privateViewerUrl)URL.revokeObjectURL(privateViewerUrl);privateViewerUrl=URL.createObjectURL(file.blob);document.getElementById('private-files-overlay').style.display='none';document.getElementById('private-file-frame').src=privateViewerUrl;document.getElementById('private-file-viewer').style.display='flex'}
+function closePrivateFileViewer(){document.getElementById('private-file-viewer').style.display='none';document.getElementById('private-file-frame').src='about:blank';if(privateViewerUrl){URL.revokeObjectURL(privateViewerUrl);privateViewerUrl=null}openPrivateFiles()}
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.getElementById('private-file-viewer').style.display!=='none')closePrivateFileViewer()});
+async function deletePrivateFile(id,name){if(!confirm(`Delete ${name}? This removes it only from this browser.`))return;const db=await privateFilesDb();const tx=db.transaction(PRIVATE_FILES_STORE,'readwrite');tx.objectStore(PRIVATE_FILES_STORE).delete(id);await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();renderPrivateFiles()}
+</script>
+<script>
+// ACCOUNT-BASED ROOMS — the same user code + password identifies the same person on every device.
+// Replaced by the Google/Supabase social module loaded after this legacy code.
+if (false) {
+let accountUser=null, accountRoom='', accountTimer=null, accountSyncTimer=null, personalSyncTimer=null, personalStateReady=false, roomIntent='', pendingRoomCode='';
+if(liveEvents) clearInterval(liveEvents);
+liveRoom=''; liveHostToken='';
+document.getElementById('room-board').style.display='none';
+function accountShape(user){return user&&{id:user.id,userCode:user.userCode||user.user_code,displayName:user.displayName||user.display_name}}
+async function accountApi(url,opts={}){const response=await fetch(url,opts);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data}
+// Keep a local copy for fast rendering, then quietly mirror it to the signed-in
+// user's private server record. This data is never sent to room members.
+const browserSave=save;
+save=function(state){browserSave(state);queuePersonalStateSync()};
+function queuePersonalStateSync(){if(!accountUser||!personalStateReady)return;clearTimeout(personalSyncTimer);personalSyncTimer=setTimeout(syncPersonalState,500)}
+async function syncPersonalState(){if(!accountUser||!personalStateReady)return;try{await accountApi('/api/personal-state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:load()})})}catch(error){console.warn('Private tracker sync failed:',error)}}
+function rerenderPrivateTracker(){activeWeek=getCurrentWeek();renderSections();buildMonthTabs();renderMonthTasks();renderConsistencyGrid();buildTimeline();updateFocusHrs();updateDiamonds()}
+async function bootstrapPersonalState(){
+  if(!accountUser||personalStateReady)return;
+  const cloud=await accountApi('/api/personal-state');
+  if(cloud.state&&typeof cloud.state==='object') localStorage.setItem(SK,JSON.stringify(cloud.state));
+  personalStateReady=true;
+  if(!cloud.state) await syncPersonalState();
+  const rolled=checkDayRollover();
+  rerenderPrivateTracker();
+  if(rolled) queuePersonalStateSync();
+}
+window.openLiveModal=function(){
+  const overlay=document.getElementById('live-overlay');
+  overlay.innerHTML='<div class="live-box" id="account-room-box"></div>';
+  overlay.style.display='flex'; showRoomChoice();
+};
+window.closeLiveModal=function(){document.getElementById('live-overlay').style.display='none'};
+function showRoomChoice(){
+  const box=document.getElementById('account-room-box');
+  box.innerHTML='<h2>Go live with friends</h2><p>Create a room you administer, or join a friend\'s existing room. Your user code and password work on every device.</p><div class="live-actions" style="justify-content:flex-start"><button class="live-action primary" onclick="chooseRoomIntent(\'create\')">Create room</button><button class="live-action" onclick="chooseRoomIntent(\'join\')">Join room</button></div><div class="live-actions"><button class="live-action" onclick="closeLiveModal()">Cancel</button></div>';
+}
+window.chooseRoomIntent=function(intent){roomIntent=intent;const box=document.getElementById('account-room-box');if(intent==='join'){box.innerHTML='<h2>Join a room</h2><p>Ask your friend for the room code.</p><input class="live-field" id="account-room-code" maxlength="12" placeholder="Room code (e.g. FOCUS24)"><div class="live-actions" style="justify-content:flex-start"><button class="live-action primary" onclick="showJoinMemberChoice()">Continue</button><button class="live-action" onclick="showRoomChoice()">Back</button></div>';return}const accountFields=accountUser?`<p>Creating as <b>${accountUser.displayName}</b>.</p>`:'<input class="live-field" id="account-name" maxlength="32" placeholder="Your display name"><input class="live-field" id="account-code" maxlength="24" placeholder="Choose your user code (e.g. BHARADWAJ_26)"><input class="live-field" id="account-password" type="password" minlength="8" placeholder="Choose a password (8+ characters)">';const action=accountUser?'finishRoom()':'submitAccount(\'register\')';const existing=accountUser?'':'<button class="live-action" onclick="showExistingAdmin()">I already have an account</button>';box.innerHTML=`<h2>Create a room</h2><p>You will become this room's admin.</p><input class="live-field" id="account-room-code" maxlength="12" placeholder="Choose a room code (e.g. FOCUS24)">${accountFields}<div class="live-error" id="account-error"></div><div class="live-actions"><button class="live-action" onclick="showRoomChoice()">Back</button>${existing}<button class="live-action primary" onclick="${action}">Create room</button></div>`};
+window.showJoinMemberChoice=function(){const code=document.getElementById('account-room-code').value.trim();if(code.length<4)return alert('Use a room code with at least 4 characters.');pendingRoomCode=code;const box=document.getElementById('account-room-box');if(accountUser){box.innerHTML=`<h2>Join as ${accountUser.displayName}</h2><p>Room: ${code.toUpperCase()}</p><div class="live-actions"><button class="live-action" onclick="chooseRoomIntent('join')">Back</button><button class="live-action primary" onclick="finishRoom()">Join room</button></div>`;return}box.innerHTML='<h2>Are you already a member?</h2><p>Use the same user code and password on every device.</p><div class="live-actions" style="justify-content:flex-start"><button class="live-action primary" onclick="showAccountForm(\'login\')">Existing member</button><button class="live-action" onclick="showAccountForm(\'register\')">New member</button></div><div class="live-actions"><button class="live-action" onclick="chooseRoomIntent(\'join\')">Back</button></div>'};
+window.showExistingAdmin=function(){pendingRoomCode=document.getElementById('account-room-code').value.trim();if(pendingRoomCode.length<4)return alert('Choose a room code with at least 4 characters.');showAccountForm('login')};
+window.showAccountForm=function(mode){const box=document.getElementById('account-room-box');const extra=mode==='register'?'<input class="live-field" id="account-name" maxlength="32" placeholder="Your display name">':'';const heading=mode==='register'?'Create your account':'Sign in to your account';const copy=mode==='register'?'Choose a user code and password. You will use these on phone and laptop.':'Enter the user code and password you created earlier.';const back=roomIntent==='join'?'showJoinMemberChoice()':'chooseRoomIntent(\'create\')';box.innerHTML=`<h2>${heading}</h2><p>${copy}</p>${extra}<input class="live-field" id="account-code" maxlength="24" placeholder="User code (e.g. BHARADWAJ_26)"><input class="live-field" id="account-password" type="password" minlength="8" placeholder="Password (8+ characters)"><div class="live-error" id="account-error"></div><div class="live-actions"><button class="live-action" onclick="${back}">Back</button><button class="live-action primary" onclick="submitAccount('${mode}')">Continue</button></div>`};
+window.submitAccount=async function(action){try{const body={action,userCode:document.getElementById('account-code').value,password:document.getElementById('account-password').value};if(action==='register')body.displayName=document.getElementById('account-name').value;const data=await accountApi('/api/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});accountUser=accountShape(data.user);liveUser=accountUser.id;liveName=accountUser.displayName;await bootstrapPersonalState();await finishRoom()}catch(error){document.getElementById('account-error').textContent=error.message}};
+window.finishRoom=async function(){try{const roomCode=pendingRoomCode||document.getElementById('account-room-code')?.value.trim();const data=await accountApi('/api/auth-room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:roomIntent,roomCode})});accountRoom=data.room.code;liveRoom=accountRoom;liveHostToken=data.room.isOwner?'account-owner':'';localStorage.setItem('tracker_account_room',accountRoom);closeLiveModal();startAccountRoom()}catch(error){alert(error.message)}};
+function startAccountRoom(){if(!liveRoom||!accountUser)return;document.getElementById('live-status').textContent='LIVE · '+liveRoom;document.getElementById('room-board').style.display='block';clearInterval(accountTimer);accountTimer=setInterval(refreshAccountRoom,5000);refreshAccountRoom();queueAccountSync()}
+async function refreshAccountRoom(){if(!liveRoom)return;try{const room=await accountApi('/api/auth-room-board?roomCode='+encodeURIComponent(liveRoom));liveHostToken=room.isOwner?'account-owner':'';renderAccountBoard(room)}catch(error){clearInterval(accountTimer);localStorage.removeItem('tracker_account_room');liveRoom='';liveHostToken='';document.getElementById('live-status').textContent='PRIVATE';document.getElementById('room-board').style.display='none'}}
+function renderAccountBoard(room){const host=document.getElementById('room-members');host.innerHTML='';const days=[];for(let i=27;i>=0;i--){const date=new Date();date.setDate(date.getDate()-i);date.setHours(0,0,0,0);days.push(date)}room.members.forEach(member=>{const card=document.createElement('div');card.className='member-card';const name=document.createElement('div');name.className='member-name';name.textContent=member.name+(member.id===liveUser?' (you)':'');const grid=document.createElement('div');grid.className='member-grid';const history=room.activity?.[member.id]||{};days.forEach(date=>{const ds=date.toDateString(),entry=history[ds],cell=document.createElement('div');cell.className='member-cell';const style=intensityToColor(entry?.intensity||0);if(style)cell.style.cssText=style;cell.addEventListener('mouseenter',event=>showCellTooltip(event,date,ds,history));cell.addEventListener('mousemove',moveCellTooltip);cell.addEventListener('mouseleave',hideCellTooltip);grid.appendChild(cell)});card.append(name,grid);if(room.isOwner&&member.id!==liveUser){const remove=document.createElement('button');remove.className='member-remove';remove.textContent='Remove member';remove.onclick=()=>removeAccountMember(member.id,member.name);card.appendChild(remove)}host.appendChild(card)});document.getElementById('room-admin-actions')?.remove();if(room.isOwner){const actions=document.createElement('div');actions.id='room-admin-actions';actions.style.cssText='margin-top:10px;display:flex;justify-content:flex-end';const removeRoom=document.createElement('button');removeRoom.className='member-remove';removeRoom.textContent='Delete this room';removeRoom.onclick=deleteAccountRoom;actions.appendChild(removeRoom);document.getElementById('room-board').appendChild(actions)}}
+async function removeAccountMember(targetId,name){if(!confirm(`Remove ${name} from this room? They can rejoin only if you give them the room code again.`))return;try{await accountApi('/api/auth-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomCode:liveRoom,targetId})});refreshAccountRoom()}catch(error){alert(error.message)}}
+async function deleteAccountRoom(){if(!confirm(`Delete room ${liveRoom}? This permanently removes all shared room data.`))return;try{await accountApi('/api/auth-delete-room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomCode:liveRoom})});clearInterval(accountTimer);localStorage.removeItem('tracker_account_room');liveRoom='';liveHostToken='';document.getElementById('live-status').textContent='PRIVATE';document.getElementById('room-board').style.display='none';alert('Room deleted. Your personal tracker remains intact.')}catch(error){alert(error.message)}}
+function queueAccountSync(){if(!liveRoom||!accountUser)return;clearTimeout(accountSyncTimer);accountSyncTimer=setTimeout(async()=>{try{await accountApi('/api/auth-snapshot',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomCode:liveRoom,consistency:load().consistency||{}})})}catch(error){console.warn(error)}},350)}
+(async function restoreAccount(){try{const data=await accountApi('/api/account?action=me');accountUser=accountShape(data.user);if(!accountUser)return;liveUser=accountUser.id;liveName=accountUser.displayName;await bootstrapPersonalState();const saved=localStorage.getItem('tracker_account_room');if(saved){liveRoom=saved;await refreshAccountRoom();if(liveRoom)startAccountRoom()}}catch(error){console.warn(error)}})();
+}
+</script>
+<script src="/api/client-config"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/social.js"></script>
+</body>
+</html>

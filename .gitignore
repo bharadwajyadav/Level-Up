@@ -1,0 +1,6 @@
+data.json
+.env
+.env.local
+.vercel
+node_modules
+public/config.js

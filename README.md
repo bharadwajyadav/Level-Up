@@ -7,7 +7,7 @@ This version replaces the previous user-code/password entry flow with Google sig
 1. Create a Supabase project and enable the **Google** provider under Authentication.
 2. In Google Cloud, register the Supabase Auth callback URL shown by the Google provider screen. Add your production URL (and local URL) to Supabase Authentication → URL Configuration redirect allow list.
 3. Run [`supabase/google-social-schema.sql`](supabase/google-social-schema.sql) in the Supabase SQL Editor.
-4. In Vercel, add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` environment variables. Do not use the service-role key in the browser.
+4. `public/runtime-config.js` contains the project URL and publishable key used by the browser. Do not put the service-role key in this file.
 5. Deploy to Vercel. Set the production URL as Supabase's Site URL.
 
 Existing legacy `/api` endpoints are retained for reference but are no longer used by the Google-account social layer. New browser calls are protected by Supabase Auth and Row Level Security.

@@ -1252,7 +1252,7 @@ function queueAccountSync(){if(!liveRoom||!accountUser)return;clearTimeout(accou
 (async function restoreAccount(){try{const data=await accountApi('/api/account?action=me');accountUser=accountShape(data.user);if(!accountUser)return;liveUser=accountUser.id;liveName=accountUser.displayName;await bootstrapPersonalState();const saved=localStorage.getItem('tracker_account_room');if(saved){liveRoom=saved;await refreshAccountRoom();if(liveRoom)startAccountRoom()}}catch(error){console.warn(error)}})();
 }
 </script>
-<script src="/api/client-config"></script>
+<script src="/runtime-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/social.js"></script>
 </body>
